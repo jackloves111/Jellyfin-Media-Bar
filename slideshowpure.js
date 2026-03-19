@@ -63,10 +63,25 @@ const loadYouTubeAPI = () => {
       resolve(window.YT);
       return;
     }
-    window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+    
+    const timeoutId = setTimeout(() => {
+      console.warn("YouTube API load timeout. Trailers will not be available.");
+      resolve(null);
+    }, 5000);
+
+    window.onYouTubeIframeAPIReady = () => {
+      clearTimeout(timeoutId);
+      resolve(window.YT);
+    };
+
     if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
+      tag.onerror = () => {
+        clearTimeout(timeoutId);
+        console.error("Failed to load YouTube API script");
+        resolve(null);
+      };
       const firstScriptTag = document.getElementsByTagName("script")[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
@@ -374,7 +389,7 @@ const waitForApiClientAndInitialize = () => {
         initJellyfinData(async () => {
           console.log("✅ Jellyfin API client initialized successfully");
           await initLocalization();
-          await loadYouTubeAPI();
+          loadYouTubeAPI(); // Do not await so it doesn't block the slideshow if YT is inaccessible
           slidesInit();
         });
       } else {
@@ -1543,7 +1558,7 @@ const SlideCreator = {
 
       // if (videoId) {
       //   loadYouTubeAPI().then((YT) => {
-      //     if (!document.getElementById(`trailer-${itemId}`)) return;
+      //     if (!YT || !document.getElementById(`trailer-${itemId}`)) return;
 
       //     STATE.slideshow.players[itemId] = new YT.Player(
       //       `yt-player-${itemId}`,
@@ -1575,7 +1590,7 @@ const SlideCreator = {
         const startTime = await ApiUtils.getSkipSegments(videoId);
 
         loadYouTubeAPI().then((YT) => {
-          if (!document.getElementById(`trailer-${itemId}`)) return;
+          if (!YT || !document.getElementById(`trailer-${itemId}`)) return;
 
           STATE.slideshow.players[itemId] = new YT.Player(
             `yt-player-${itemId}`,
